@@ -67,8 +67,8 @@ URL base: `http://localhost:3000/api`
 ```
 
 ### GET `/get?key=databaseKey`
-```json
-{ "P": [...], "N": [...], "value": 98 }
+```js
+1 
 ```
 
 ---
@@ -149,7 +149,7 @@ server {
 
 ### mic-apiservice
 - `API_PORT` (por defecto `3000`)
-- `DB_SERVICE_URL` (por defecto `http://load-balancer:4000`)
+- `DB_SERVICE_URL` (por defecto `http://localhost:4000`)
 
 ### mic-dbservice
 - `DB_PORT` (por defecto `4000`)
