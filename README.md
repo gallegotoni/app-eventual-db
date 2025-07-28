@@ -116,7 +116,7 @@ La API se expone bajo `/api` y la DB bajo `/db`.
 
 ---
 
-🚀 Escalado Dinámico
+## 🚀 Escalado Dinámico
 
 ```bash
 docker compose up -d --scale mic-db=n
@@ -124,3 +124,9 @@ docker compose up -d --scale mic-db=n
 Siendo n el numero de replicas deseadas de la base de datos
 
 ---
+
+## 📝 TODO
+
+- Aplicar la convergencia entre replicas
+- Vacíar los arrays de positivos y negativos
+- Evaluar las políticas de convergencia
