@@ -127,6 +127,7 @@ Siendo n el numero de replicas deseadas de la base de datos
 
 ## 📝 TODO
 
+- Arreglar la ejecución de TypeScript en modo desarrollo
 - Aplicar la convergencia entre replicas
 - Vacíar los arrays de positivos y negativos
 - Evaluar las políticas de convergencia
