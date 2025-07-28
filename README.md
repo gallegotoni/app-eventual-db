@@ -5,7 +5,7 @@ Aplicación distribuida que implementa un contador replicado con consistencia ev
 - `mic-apiservice`: interfaz RESTful para operar con el contador (add, get, increment, decrement, delete).
 - `mic-dbservice`: almacén distribuido que sincroniza estados entre nodos y converge mediante CRDT (Counter basado en G-Counters).
 
-Usa un balanceador NGINX para distribuir carga entre réplicas de `mic-dbservice`.
+Usa un balanceador Traefik para distribuir carga entre réplicas de `mic-dbservice`.
 
 ---
 
@@ -23,9 +23,8 @@ app-eventual-db/
 │   ├── package.json
 │   └── src/
 │       └── main.ts
-├── nginx/
-│   └── nginx.conf
-├── docker-compose.yml
+│       └── peer-manager.ts
+├── docker-compose.yaml
 ```
 
 ---
@@ -33,12 +32,10 @@ app-eventual-db/
 ## 🛠️ Comando de Build y Arranque
 
 ```bash
-# Asigna número de réplicas modificando directamente docker-compose.yml y nginx.conf
-
-# Construir e iniciar contenedores
-docker-compose up --build
+docker-compose up -d
 ```
 
+Por defecto lanzará una replica de la API (mic-apiservice) y una replica de la base de datos (mic-dbservice), además del balanceador de carga.
 
 ---
 
@@ -89,7 +86,7 @@ Las instancias intercambian su estado mediante `/sync` y aplican convergencia pe
 
 ### POST `/sync`
 ```json
-{ "key": "dataseKey", "P": [1,2,3], "N": [1] }
+{ "key": "databaseKey", "P": [1,2,3], "N": [1] }
 ```
 
 Aplica la política de convergencia local:
@@ -99,49 +96,10 @@ value = sum(P) - sum(N)
 
 ---
 
-## 📦 Dockerfile - mic-apiservice
+## 🌐 Traefik como Balanceador
 
-```Dockerfile
-FROM node:18
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-CMD ["node", "dist/main.js"]
-```
-
-## 📦 Dockerfile - mic-dbservice
-
-```Dockerfile
-FROM node:18
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-CMD ["node", "dist/main.js"]
-```
-
----
-
-## 🌐 NGINX como Balanceador
-
-`nginx.conf` define las réplicas de `mic-dbservice`:
-
-```nginx
-upstream db_cluster {
-  server db1:4000;
-  server db2:4000;
-  server db3:4000;
-}
-server {
-  listen 4000;
-  location / {
-    proxy_pass http://db_cluster;
-  }
-}
-```
+El archivo `docker-compose.yaml` ya incluye la configuración para Traefik como proxy inverso y balanceador de carga para los servicios API y DB.  
+La API se expone bajo `/api` y la DB bajo `/db`.
 
 ---
 
@@ -149,16 +107,20 @@ server {
 
 ### mic-apiservice
 - `API_PORT` (por defecto `3000`)
-- `DB_SERVICE_URL` (por defecto `http://localhost:4000`)
+- `DB_SERVICE_URL` (por defecto `http://traefik/db` el balanceador de carga)
 
 ### mic-dbservice
 - `DB_PORT` (por defecto `4000`)
-- `PEERS` (lista separada por comas de URLs de otras instancias)
+- `DNS_SERVICE_NAME` (por defecto `mic-db`)
+- `PEERS` (OPCIONAL, lista separada por comas de URLs de otras instancias)
 
 ---
 
 🚀 Escalado Dinámico
 
-Modifica el número de réplicas manualmente en `docker-compose.yml` y `nginx.conf`.
+```bash
+docker compose up -d --scale mic-db=n
+```
+Siendo n el numero de replicas deseadas de la base de datos
 
 ---

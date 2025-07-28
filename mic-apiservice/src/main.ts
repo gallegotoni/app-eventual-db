@@ -56,6 +56,14 @@ app.get('/api/get', async (req: Request, res: Response) => {
     }
 });
 
+app.get('/debug/ping', async (_req: Request, res: Response) => {
+    try {
+        res.json({ message: 'Pong' });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 const PORT = process.env.API_PORT || 3000;
 app.listen(PORT, () => {
     console.log(`API service running on port ${PORT}`);

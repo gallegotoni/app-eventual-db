@@ -1,6 +1,8 @@
 import axios from 'axios';
 import express, { Request, Response } from 'express';
 
+import { PeerManager } from './peer-manager.js';
+
 interface DataEntry {
     P: number[];
     N: number[];
@@ -9,12 +11,12 @@ interface DataEntry {
 
 class Database {
     private database: Record<string, DataEntry> = {};
-    private peers: string[];
     private lastWriteTime: number;
     private syncInterval: number;
+    private peerManager: PeerManager;
 
-    constructor(peers: string[] = [], syncInterval: number = 5000) {
-        this.peers = peers;
+    constructor(peerManager: PeerManager, syncInterval: number = 10000) {
+        this.peerManager = peerManager;
         this.lastWriteTime = Date.now();
         this.syncInterval = syncInterval;
         this.startSyncTimer();
@@ -26,6 +28,8 @@ class Database {
         }
         this.database[key].P.push(value);
         this.database[key].value += value;
+        console.log(`Incremented key: ${key} by ${value}. New value: ${this.database[key].value}`);
+        console.log(`Current P: ${this.database[key].P}, N: ${this.database[key].N}`);
         this.lastWriteTime = Date.now();
         return this.database[key].value;
     }
@@ -63,14 +67,19 @@ class Database {
         const sumP = P.reduce((a, b) => a + b, 0);
         const sumN = N.reduce((a, b) => a + b, 0);
         this.database[key].value = sumP - sumN;
-        this.database[key].P = [];
-        this.database[key].N = [];
+        console.log(`Convergence applied for key: ${key}. New value: ${this.database[key].value}`);
         this.lastWriteTime = Date.now();
     }
 
+    async discoverNewPeers(): Promise<void> {
+        await this.peerManager.discoverNewPeers();
+        console.log('Current peers:', this.peerManager.getPeers());
+    }
+
     startSyncTimer(): void {
-        setInterval(() => {
+        setInterval(async () => {
             if (Date.now() - this.lastWriteTime >= this.syncInterval) {
+                await this.discoverNewPeers();
                 this.syncWithPeers();
             }
         }, this.syncInterval);
@@ -79,18 +88,25 @@ class Database {
     syncWithPeers(): void {
         Object.keys(this.database).forEach(key => {
             const data = { key, P: this.database[key].P, N: this.database[key].N };
-            this.peers.forEach(peer => {
-                axios.post(`${peer}/api/sync`, data)
+            console.log(`Syncing key: ${key} with peers...`);
+            console.log('Data to sync:', data);
+            this.peerManager.getPeers().forEach(peer => {
+                axios.post(`${peer}/sync`, data)
                     .catch(err => console.error(`Sync error with ${peer}:`, err.message));
             });
         });
     }
+
+
 }
 
 const app = express();
 app.use(express.json());
 const peers: string[] = process.env.PEERS ? process.env.PEERS.split(',') : [];
-const db = new Database(peers);
+const SERVICE_NAME = process.env.DNS_SERVICE_NAME || 'mic-db';
+const PORT = Number(process.env.DB_PORT) || 4000;
+const peerManager = new PeerManager(SERVICE_NAME, PORT, peers);
+const db = new Database(peerManager);
 
 // Endpoints REST API compatibles con mic-apiservice
 
@@ -126,16 +142,17 @@ app.get('/get', (req: Request, res: Response) => {
 
 app.post('/sync', (req: Request, res: Response) => {
     const { key, P, N }: { key: string; P: number[]; N: number[] } = req.body;
+    console.log(` 🔄 Syncing key: ${key} with P: ${P}, N: ${N}`);
     if (!db.get(key)) {
         db.add(key, 0);
     }
     db.get(key)!.P.push(...P);
     db.get(key)!.N.push(...N);
     db.applyConvergence(key);
-    res.json({ message: 'Synchronized' });
+    console.log(` ✅ Synced key: ${key} with P: ${P}, N: ${N}`);
+    res.json({});
 });
 
-const PORT = process.env.DB_PORT || 4000;
 app.listen(PORT, () => {
     console.log(`Database service running on port ${PORT}`);
 });
